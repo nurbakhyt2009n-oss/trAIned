@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>trAIned · Дашборд</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/style.css">
+
+<style>
+/* ====== СТИЛИ ТОЛЬКО ДЛЯ ДАШБОРДА ====== */
+.panel{ display:none; animation:fade .35s var(--ease); }
+.panel.active{ display:block; }
+@keyframes fade{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+
+.recovery{ display:flex; align-items:center; gap:28px; }
+.ring{ position:relative; width:120px; height:120px; flex:none; }
+.ring svg{ transform:rotate(-90deg); }
+.ring .val{ position:absolute; inset:0; display:grid; place-items:center; font-family:'JetBrains Mono',monospace; font-size:30px; font-weight:500; color:var(--text); }
+.recovery-info .status{ font-size:15px; font-weight:600; margin-bottom:6px; }
+.recovery-info .desc{ font-size:13px; color:var(--text-dim); max-width:340px; }
+.recovery-mini{ display:flex; gap:24px; margin-top:14px; }
+.recovery-mini .m .k{ font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; }
+.recovery-mini .m .v{ font-family:'JetBrains Mono',monospace; font-size:17px; margin-top:3px; }
+
+.kpi .k{ font-size:12px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; }
+.kpi .v{ font-family:'JetBrains Mono',monospace; font-size:26px; color:var(--text); margin-top:8px; }
+.kpi .v .u{ font-size:12px; color:var(--text-mute); margin-left:4px; }
+.kpi .sub{ font-size:12px; color:var(--accent); margin-top:6px; }
+
+.macros{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+.macro{ background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius-sm); padding:18px; }
+.macro .v{ font-family:'JetBrains Mono',monospace; font-size:24px; color:var(--accent-bright); }
+.macro .k{ font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; }
+
+.range-row{ display:flex; align-items:center; gap:16px; }
+input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:6px; background:linear-gradient(90deg, var(--accent-deep), var(--accent)); outline:none; }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--accent-bright); border:3px solid var(--bg); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.5); }
+input[type=range]::-moz-range-thumb{ width:20px; height:20px; border-radius:50%; background:var(--accent-bright); border:3px solid var(--bg); cursor:pointer; }
+.range-val{ font-family:'JetBrains Mono',monospace; font-size:20px; color:var(--accent); width:52px; text-align:right; }
+
+.ai-out{ margin-top:20px; background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius); padding:22px; font-size:14px; line-height:1.7; color:var(--text-dim); white-space:pre-wrap; min-height:60px; }
+.ai-out.empty{ color:var(--text-mute); font-style:italic; }
+
+.empty-state{ text-align:center; padding:60px 20px; color:var(--text-mute); }
+.empty-state a{ color:var(--accent); }
+
+@media (max-width:860px){
+  .recovery{ flex-direction:column; align-items:flex-start; }
+  .macros{ grid-template-columns:repeat(2,1fr); }
+}
+</style>
+</head>
+
+<body>
+
+<nav class="topbar">
+  <a class="brand" href="/">tr<span class="hl">AI</span>ned</a>
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Обзор</button>
+    <button class="tab" data-tab="nutrition">Питание</button>
+    <button class="tab" data-tab="training">Тренировки</button>
+    <a class="tab" href="/workout.html">Журнал</a>
+    <a class="tab" href="/food.html">Еда</a>
+    <a class="tab" href="/analytics.html">Аналитика</a>
+  </div>
+  <div class="top-right">
+    <a class="chat-link" href="/chat.html"><span class="dot"></span>AI-тренер</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <div class="hello">
+    <span class="eyebrow" id="todayLabel">Сегодня</span>
+    <h1 id="greeting">Привет!</h1>
+  </div>
+
+  <section class="panel active" id="overview">
+    <div class="grid cols-2">
+      <div class="card col-span-2">
+        <div class="card-title">
+          <span class="ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7-4.5-9.5-9C.5 8 2.5 4 6.5 4 9 4 12 7 12 7s3-3 5.5-3c4 0 6 4 4 8-2.5 4.5-9.5 9-9.5 9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </span>
+          <h2>Recovery Score</h2>
+        </div>
+        <div class="recovery" id="recoveryBox">
+          <div class="ring">
+            <svg width="120" height="120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(231,222,200,.08)" stroke-width="10"/>
+              <circle id="ringFg" cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="10"
+                      stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="327"/>
+            </svg>
+            <div class="val" id="recoveryVal">—</div>
+          </div>
+          <div class="recovery-info">
+            <div class="status" id="recoveryStatus">Нет данных за сегодня</div>
+            <div class="desc" id="recoveryDesc">Заполни чек-ин ниже — и тренер рассчитает, насколько ты восстановился.</div>
+            <div class="recovery-mini" id="recoveryMini" style="display:none;">
+              <div class="m"><div class="k">Сон</div><div class="v"><span id="recSleep">—</span> ч</div></div>
+              <div class="m"><div class="k">Усталость</div><div class="v"><span id="recFatigue">—</span>/10</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card kpi">
+        <div class="k">Цель</div>
+        <div class="v" id="kpiGoal" style="font-size:20px;">—</div>
+        <div class="sub" id="kpiExp">—</div>
+      </div>
+
+      <div class="card kpi">
+        <div class="k">Норма калорий</div>
+        <div class="v"><span id="kpiCal">—</span><span class="u">ккал</span></div>
+        <div class="sub" id="kpiWater">—</div>
+      </div>
+    </div>
+
+    <div class="card section-gap">
+      <div class="card-title">
+        <span class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <h2>Чек-ин на сегодня</h2>
+      </div>
+      <div class="grid cols-3">
+        <div class="field">
+          <span class="label">Сон, часов</span>
+          <input class="input" type="number" id="inSleep" min="0" max="14" step="0.5" placeholder="7.5">
+        </div>
+        <div class="field">
+          <span class="label">Вес, кг</span>
+          <input class="input" type="number" id="inWeight" min="30" max="250" step="0.1" placeholder="54">
+        </div>
+        <div class="field">
+          <span class="label">Усталость</span>
+          <div class="range-row">
+            <input type="range" id="inFatigue" min="1" max="10" value="5">
+            <span class="range-val" id="fatigueVal">5</span>
+          </div>
+        </div>
+      </div>
+      <div class="field section-gap">
+        <span class="label">Заметка (необязательно)</span>
+        <input class="input" type="text" id="inNotes" placeholder="Как самочувствие, что болит, настроение…">
+      </div>
+      <div class="section-gap">
+        <button class="btn" id="saveCheckin">Сохранить чек-ин</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="nutrition">
+    <div class="card">
+      <div class="card-title">
+        <span class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 002-2V2M5 11v11M11 2c-1.5 0-2 2-2 5s.5 4 2 4 2-1 2-4-.5-5-2-5zm0 13v7M16 8a4 4 0 108 0c0-3-2-6-4-6s-4 3-4 6zm4 0v14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <h2>Твоя норма КБЖУ</h2>
+      </div>
+      <div class="macros">
+        <div class="macro"><div class="v"><span id="mCal">—</span></div><div class="k">Калории</div></div>
+        <div class="macro"><div class="v"><span id="mP">—</span></div><div class="k">Белки, г</div></div>
+        <div class="macro"><div class="v"><span id="mF">—</span></div><div class="k">Жиры, г</div></div>
+        <div class="macro"><div class="v"><span id="mC">—</span></div><div class="k">Углеводы, г</div></div>
+      </div>
+      <p class="muted section-gap">Расчёт по формуле Миффлина-Сан Жеора с учётом твоей цели и активности. Вода в день: <span id="mWater">—</span> л.</p>
+    </div>
+
+    <div class="card section-gap">
+      <div class="card-title">
+        <span class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 17l-4.9 2.6.9-5.5-4-3.9 5.5-.8L12 3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </span>
+        <h2>Меню на день</h2>
+      </div>
+      <div class="grid cols-2">
+        <div class="field">
+          <span class="label">Предпочтения в еде</span>
+          <input class="input" type="text" id="mealPref" placeholder="Например: без свинины, люблю курицу и рис">
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <button class="btn" id="genMeal">Сгенерировать меню</button>
+        </div>
+      </div>
+      <div class="ai-out empty" id="mealOut">Нажми кнопку — тренер составит меню под твои калории и БЖУ.</div>
+    </div>
+  </section>
+
+  <section class="panel" id="training">
+    <div class="card">
+      <div class="card-title">
+        <span class="ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6.5 6.5l11 11M4 9l-2 2 3 3-2 2 2 2 2-2 3 3 2-2M20 15l2-2-3-3 2-2-2-2-2 2-3-3-2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <h2>Тренировка на сегодня</h2>
+      </div>
+      <p class="muted">Тренер составит программу с учётом твоей усталости, сна и силовых. Заполни чек-ин на вкладке «Обзор», чтобы было точнее.</p>
+      <div class="section-gap">
+        <button class="btn" id="genWorkout">Составить тренировку</button>
+      </div>
+      <div class="ai-out empty" id="workoutOut">Здесь появится твоя тренировка на сегодня.</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+<script>
+/* ====== ЛОГИКА ДАШБОРДА ====== */
+const tabs = $$('.tab[data-tab]');
+const panels = $$('.panel');
+tabs.forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    tabs.forEach(t=>t.classList.remove('active'));
+    panels.forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  });
+});
+
+async function loadProfile(){
+  try{
+    const res = await fetch('/api/profile');
+    if(res.status === 404){
+      document.querySelector('.wrap').innerHTML =
+        '<div class="empty-state">Профиль ещё не создан.<br><br><a href="/">Заполнить онбординг →</a></div>';
+      return;
+    }
+    const p = await res.json();
+    document.getElementById('greeting').textContent = 'Привет, ' + (p.name || 'атлет') + '!';
+    document.getElementById('kpiGoal').textContent = GOAL_LABELS[p.goal] || p.goal || '—';
+    document.getElementById('kpiExp').textContent = EXP_LABELS[p.experience] || p.experience || '';
+    if(p.weight) document.getElementById('inWeight').placeholder = p.weight;
+    loadNutrition();
+    loadRecovery();
+  }catch(err){
+    showToast('Сервер недоступен. Запущен ли uvicorn?');
+  }
+}
+
+async function loadNutrition(){
+  try{
+    const n = await apiGet('/api/nutrition/plan');
+    document.getElementById('mCal').textContent = n.target_calories ?? '—';
+    document.getElementById('mP').textContent   = n.protein ?? '—';
+    document.getElementById('mF').textContent   = n.fat ?? '—';
+    document.getElementById('mC').textContent   = n.carbs ?? '—';
+    document.getElementById('mWater').textContent = n.water ?? '—';
+    document.getElementById('kpiCal').textContent = n.target_calories ?? '—';
+    document.getElementById('kpiWater').textContent = (n.water ? n.water + ' л воды в день' : '');
+  }catch(err){}
+}
+
+function paintRing(score){
+  const r = 52, circ = 2 * Math.PI * r;
+  const offset = circ - (score/100) * circ;
+  const fg = document.getElementById('ringFg');
+  fg.style.strokeDasharray = circ.toFixed(0);
+  fg.style.strokeDashoffset = offset.toFixed(0);
+  let color = 'var(--bad)';
+  if(score >= 75) color = 'var(--good)';
+  else if(score >= 50) color = 'var(--warn)';
+  fg.style.stroke = color;
+}
+async function loadRecovery(){
+  try{
+    const res = await fetch('/api/recovery');
+    if(res.status === 404){
+      document.getElementById('recoveryVal').textContent = '—';
+      return;
+    }
+    const rec = await res.json();
+    document.getElementById('recoveryVal').textContent = rec.recovery_score;
+    document.getElementById('recoveryStatus').textContent = rec.status;
+    document.getElementById('recoveryDesc').textContent = 'Балл рассчитан по сну и уровню усталости из последнего чек-ина.';
+    document.getElementById('recoveryMini').style.display = 'flex';
+    document.getElementById('recSleep').textContent = rec.sleep_hours;
+    document.getElementById('recFatigue').textContent = rec.fatigue;
+    paintRing(rec.recovery_score);
+  }catch(err){}
+}
+
+const fatigue = document.getElementById('inFatigue');
+const fatigueVal = document.getElementById('fatigueVal');
+fatigue.addEventListener('input', ()=> fatigueVal.textContent = fatigue.value);
+
+document.getElementById('saveCheckin').addEventListener('click', async (e)=>{
+  const btn = e.target;
+  const sleep = document.getElementById('inSleep').value;
+  if(!sleep){ showToast('Укажи, сколько ты спал'); return; }
+
+  const data = {
+    sleep_hours: Number(sleep),
+    fatigue: Number(fatigue.value),
+    weight: document.getElementById('inWeight').value ? Number(document.getElementById('inWeight').value) : null,
+    notes: document.getElementById('inNotes').value.trim()
+  };
+
+  btn.disabled = true; btn.textContent = 'Сохраняем…';
+  try{
+    await apiPost('/api/training/log', data);
+    showToast('Чек-ин сохранён ✓');
+    loadRecovery();
+  }catch(err){
+    showToast('Не удалось сохранить чек-ин');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Сохранить чек-ин';
+  }
+});
+
+document.getElementById('genMeal').addEventListener('click', async (e)=>{
+  const btn = e.target;
+  const out = document.getElementById('mealOut');
+  out.classList.remove('empty');
+  out.innerHTML = '<span class="spinner"></span>Тренер составляет меню…';
+  btn.disabled = true;
+  try{
+    const data = await apiPost('/api/nutrition/meal-plan', {
+      preferences: document.getElementById('mealPref').value.trim() || 'обычное питание'
+    });
+    out.textContent = data.meal_plan || 'Пустой ответ от AI.';
+  }catch(err){
+    out.textContent = 'Не удалось сгенерировать меню. Проверь сервер.';
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('genWorkout').addEventListener('click', async (e)=>{
+  const btn = e.target;
+  const out = document.getElementById('workoutOut');
+  out.classList.remove('empty');
+  out.innerHTML = '<span class="spinner"></span>Тренер составляет программу…';
+  btn.disabled = true;
+  try{
+    const data = await apiPost('/api/training/workout', null);
+    out.textContent = data.workout || 'Пустой ответ от AI.';
+  }catch(err){
+    out.textContent = 'Не удалось составить тренировку. Проверь сервер.';
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('todayLabel').textContent =
+  new Date().toLocaleDateString('ru-RU', { weekday:'long', day:'numeric', month:'long' });
+
+loadProfile();
+</script>
+</body>
+</html>

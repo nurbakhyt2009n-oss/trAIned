@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>trAIned · Журнал тренировок</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/style.css">
+
+<style>
+/* ====== СТИЛИ ТОЛЬКО ДЛЯ ЖУРНАЛА ТРЕНИРОВОК ====== */
+
+/* фильтр по инвентарю */
+.eq-filter{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.eq-chip{ border:1px solid var(--line); background:var(--bg-2); color:var(--text-mute); padding:7px 15px; border-radius:999px; cursor:pointer; font-family:'Manrope',sans-serif; font-size:13px; font-weight:500; transition:all .2s var(--ease); }
+.eq-chip:hover{ color:var(--text); border-color:var(--line-strong); }
+.eq-chip.active{ border-color:var(--accent); color:var(--accent-bright); background:linear-gradient(180deg, rgba(200,168,106,.12), rgba(200,168,106,.03)); }
+
+/* выбор категории */
+.cat-tabs{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+.cat-tab{ border:1px solid var(--line); background:var(--surface); color:var(--text-dim); padding:9px 18px; border-radius:var(--radius-sm); cursor:pointer; font-family:'Manrope',sans-serif; font-size:14px; font-weight:500; transition:all .2s var(--ease); }
+.cat-tab:hover{ border-color:var(--line-strong); color:var(--text); }
+.cat-tab.active{ border-color:var(--accent); color:var(--text); background:linear-gradient(180deg, rgba(200,168,106,.14), rgba(200,168,106,.05)); }
+
+/* список упражнений */
+.ex-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; margin-bottom:8px; }
+.ex-item{ text-align:left; border:1px solid var(--line); background:var(--bg-2); border-radius:var(--radius-sm); padding:14px 16px; cursor:pointer; transition:all .2s var(--ease); }
+.ex-item:hover{ border-color:var(--accent-deep); transform:translateY(-2px); }
+.ex-item.active{ border-color:var(--accent); background:linear-gradient(180deg, rgba(200,168,106,.12), rgba(200,168,106,.03)); }
+.ex-item .en{ font-size:14px; font-weight:600; color:var(--text); }
+.ex-item .em{ font-size:11px; color:var(--text-mute); margin-top:4px; }
+.badges{ display:flex; gap:6px; margin-top:9px; flex-wrap:wrap; }
+.badge{ display:inline-block; font-size:10px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.05em; padding:2px 7px; border-radius:5px; background:var(--surface-2); color:var(--text-mute); }
+.badge.type{ color:var(--accent); }
+.badge.lvl-beginner{ color:var(--good); }
+.badge.lvl-intermediate{ color:var(--warn); }
+.badge.lvl-advanced{ color:var(--bad); }
+
+/* карточка выбранного упражнения */
+.detail-tip{ font-size:13px; color:var(--text-dim); line-height:1.6; margin-top:4px; }
+.detail-meta{ display:flex; gap:24px; flex-wrap:wrap; margin-top:12px; }
+.detail-meta .dm .k{ font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; }
+.detail-meta .dm .v{ font-size:14px; color:var(--text); margin-top:2px; }
+
+/* техника и ошибки */
+.tech{ margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.tech-col{ background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius-sm); padding:18px; }
+.tech-col h3{ font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); margin-bottom:12px; font-weight:600; }
+.tech-col.mist h3{ color:var(--bad); }
+.tech-col ol, .tech-col ul{ padding-left:18px; display:flex; flex-direction:column; gap:8px; margin:0; }
+.tech-col li{ font-size:13px; color:var(--text-dim); line-height:1.55; }
+
+/* блок прошлый раз / подсказка / рекорд */
+.prog-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:20px; }
+.prog-card{ background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius-sm); padding:16px; }
+.prog-card .pk{ font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; }
+.prog-card .pv{ font-family:'JetBrains Mono',monospace; font-size:18px; color:var(--text); margin-top:8px; }
+.prog-card.hint .pv{ font-family:'Manrope',sans-serif; font-size:13px; color:var(--accent); line-height:1.5; font-weight:500; }
+.prog-card.record .pv{ color:var(--accent-bright); }
+
+/* форма записи */
+.log-row{ display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:14px; align-items:end; margin-top:20px; }
+.log-row .btn{ height:48px; }
+
+/* история */
+.session{ margin-bottom:22px; }
+.session-date{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; }
+.entry{ display:flex; align-items:center; gap:14px; padding:12px 16px; background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius-sm); margin-bottom:8px; }
+.entry .ename{ font-size:14px; font-weight:600; color:var(--text); flex:1; }
+.entry .eval{ font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--text-dim); }
+
+.hidden{ display:none; }
+.placeholder{ color:var(--text-mute); font-size:14px; padding:30px 0; text-align:center; font-style:italic; }
+.empty-hist{ color:var(--text-mute); font-size:14px; text-align:center; padding:30px 0; }
+
+@media (max-width:860px){
+  .tech{ grid-template-columns:1fr; }
+  .log-row{ grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+
+<body>
+
+<nav class="topbar">
+  <a class="brand" href="/">tr<span class="hl">AI</span>ned</a>
+  <div class="tabs">
+    <a class="tab" href="/dashboard.html">Дашборд</a>
+    <a class="tab active" href="/workout.html">Журнал</a>
+    <a class="tab" href="/food.html">Еда</a>
+    <a class="tab" href="/analytics.html">Аналитика</a>
+  </div>
+  <div class="top-right">
+    <a class="chat-link" href="/chat.html"><span class="dot"></span>AI-тренер</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="hello">
+    <span class="eyebrow">Тренировки</span>
+    <h1>Журнал тренировок</h1>
+  </div>
+
+  <!-- ВЫБОР УПРАЖНЕНИЯ -->
+  <div class="card">
+    <div class="card-title">
+      <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6.5 6.5l11 11M4 9l-2 2 3 3-2 2 2 2 2-2 3 3 2-2M20 15l2-2-3-3 2-2-2-2-2 2-3-3-2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <h2>Выбери упражнение</h2>
+    </div>
+    <div class="eq-filter" id="eqFilter"></div>
+    <div class="cat-tabs" id="catTabs"></div>
+    <div class="ex-list" id="exList"></div>
+  </div>
+
+  <!-- ВЫБРАННОЕ УПРАЖНЕНИЕ -->
+  <div class="card section-gap hidden" id="detailCard">
+    <div class="card-title">
+      <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <h2 id="detailName">—</h2>
+    </div>
+    <p class="detail-tip" id="detailTip">—</p>
+    <div class="detail-meta">
+      <div class="dm"><div class="k">Мышцы</div><div class="v" id="detailMuscles">—</div></div>
+      <div class="dm"><div class="k">Инвентарь</div><div class="v" id="detailEquip">—</div></div>
+      <div class="dm"><div class="k">Уровень</div><div class="v" id="detailLevel">—</div></div>
+    </div>
+
+    <!-- техника и ошибки -->
+    <div class="tech">
+      <div class="tech-col">
+        <h3>Техника выполнения</h3>
+        <ol id="techSteps"></ol>
+      </div>
+      <div class="tech-col mist">
+        <h3>Частые ошибки</h3>
+        <ul id="techMistakes"></ul>
+      </div>
+    </div>
+
+    <div class="section-gap">
+      <a class="btn btn-ghost" id="videoBtn" href="#" target="_blank" rel="noopener"
+         style="text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+        ▶ Смотреть технику (видео)
+      </a>
+    </div>
+
+    <!-- прошлый раз / подсказка / рекорд -->
+    <div class="prog-grid">
+      <div class="prog-card"><div class="pk">Прошлый раз</div><div class="pv" id="progLast">—</div></div>
+      <div class="prog-card hint"><div class="pk">Подсказка</div><div class="pv" id="progHint">—</div></div>
+      <div class="prog-card record"><div class="pk">Рекорд 🏆</div><div class="pv" id="progRecord">—</div></div>
+    </div>
+
+    <!-- форма записи подхода -->
+    <div class="log-row">
+      <div class="field">
+        <span class="label">Подходы</span>
+        <input class="input" type="number" id="inSets" min="1" max="20" value="3">
+      </div>
+      <div class="field">
+        <span class="label" id="repsLabel">Повторы</span>
+        <input class="input" type="number" id="inReps" min="1" max="100" value="8">
+      </div>
+      <div class="field">
+        <span class="label" id="weightLabel">Вес, кг</span>
+        <input class="input" type="number" id="inWeight" min="0" max="500" step="0.5" value="0">
+      </div>
+      <button class="btn" id="logBtn">Записать</button>
+    </div>
+  </div>
+
+  <!-- ИСТОРИЯ -->
+  <div class="card section-gap">
+    <div class="card-title">
+      <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18M7 14l4-4 3 3 5-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <h2>История тренировок</h2>
+    </div>
+    <div id="history"><div class="empty-hist">Пока пусто. Запиши первый подход выше.</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+<script>
+/* ====== ЛОГИКА ЖУРНАЛА ТРЕНИРОВОК ====== */
+const EQUIP_LABELS = { bodyweight:'Своё тело', dumbbells:'Гантели', gym:'Зал / штанга', band:'Резина / жгут' };
+const LEVEL_LABELS = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый' };
+
+let library = [];          // библиотека по категориям
+let currentItems = [];     // упражнения текущей категории
+let equipFilter = 'all';   // фильтр по инвентарю
+let currentEx = null;      // выбранное упражнение
+
+// ---------- загрузка библиотеки ----------
+async function loadLibrary(){
+  try{
+    library = await apiGet('/api/exercises');
+    renderEquipFilter();
+    renderCategories();
+  }catch(err){
+    showToast('Не удалось загрузить упражнения. Проверь сервер.');
+  }
+}
+
+// ---------- фильтр по инвентарю ----------
+function renderEquipFilter(){
+  const box = document.getElementById('eqFilter');
+  box.innerHTML = '';
+  const options = [['all','Весь инвентарь']].concat(Object.entries(EQUIP_LABELS));
+  options.forEach(([id, label], i)=>{
+    const chip = document.createElement('button');
+    chip.className = 'eq-chip' + (i === 0 ? ' active' : '');
+    chip.textContent = label;
+    chip.addEventListener('click', ()=>{
+      $$('.eq-chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      equipFilter = id;
+      renderExercises();
+    });
+    box.appendChild(chip);
+  });
+}
+
+// ---------- категории ----------
+function renderCategories(){
+  const tabs = document.getElementById('catTabs');
+  tabs.innerHTML = '';
+  library.forEach((group, i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'cat-tab' + (i === 0 ? ' active' : '');
+    btn.textContent = group.category;
+    btn.addEventListener('click', ()=>{
+      $$('.cat-tab').forEach(t=>t.classList.remove('active'));
+      btn.classList.add('active');
+      currentItems = group.exercises;
+      renderExercises();
+    });
+    tabs.appendChild(btn);
+  });
+  if(library.length){
+    currentItems = library[0].exercises;
+    renderExercises();
+  }
+}
+
+// ---------- список упражнений (с учётом фильтра) ----------
+function renderExercises(){
+  const list = document.getElementById('exList');
+  list.innerHTML = '';
+  const items = equipFilter === 'all'
+    ? currentItems
+    : currentItems.filter(ex => ex.equipment === equipFilter);
+
+  if(!items.length){
+    list.innerHTML = '<div class="placeholder">С этим инвентарём в категории пока пусто — выбери другой фильтр.</div>';
+    return;
+  }
+
+  items.forEach(ex=>{
+    const el = document.createElement('button');
+    el.className = 'ex-item';
+    el.innerHTML =
+      '<div class="en"></div>' +
+      '<div class="em"></div>' +
+      '<div class="badges">' +
+        '<span class="badge type">' + (ex.type === 'weight' ? 'вес' : 'повторы') + '</span>' +
+        '<span class="badge lvl-' + ex.level + '">' + (LEVEL_LABELS[ex.level] || ex.level) + '</span>' +
+        '<span class="badge">' + (EQUIP_LABELS[ex.equipment] || ex.equipment) + '</span>' +
+      '</div>';
+    el.querySelector('.en').textContent = ex.name;
+    el.querySelector('.em').textContent = ex.muscles;
+    el.addEventListener('click', ()=>{
+      $$('.ex-item').forEach(i=>i.classList.remove('active'));
+      el.classList.add('active');
+      selectExercise(ex);
+    });
+    list.appendChild(el);
+  });
+}
+
+// ---------- выбор упражнения ----------
+function selectExercise(ex){
+  currentEx = ex;
+  document.getElementById('detailCard').classList.remove('hidden');
+  document.getElementById('detailName').textContent = ex.name;
+  document.getElementById('detailTip').textContent = ex.tip;
+  document.getElementById('detailMuscles').textContent = ex.muscles;
+  document.getElementById('detailEquip').textContent = EQUIP_LABELS[ex.equipment] || ex.equipment;
+  document.getElementById('detailLevel').textContent = LEVEL_LABELS[ex.level] || ex.level;
+
+  // техника и ошибки
+  const steps = document.getElementById('techSteps');
+  steps.innerHTML = '';
+  (ex.technique || []).forEach(s=>{
+    const li = document.createElement('li'); li.textContent = s; steps.appendChild(li);
+  });
+  const mist = document.getElementById('techMistakes');
+  mist.innerHTML = '';
+  (ex.mistakes || []).forEach(s=>{
+    const li = document.createElement('li'); li.textContent = s; mist.appendChild(li);
+  });
+
+  // кнопка видео — поиск техники по названию
+  document.getElementById('videoBtn').href =
+    'https://www.youtube.com/results?search_query=' + encodeURIComponent(ex.name + ' техника выполнения');
+
+  // подписи полей: секунды для планок, доп.вес для своего тела
+  const isHold = ex.id === 'plank' || ex.id === 'side_plank';
+  document.getElementById('repsLabel').textContent = isHold ? 'Секунды' : 'Повторы';
+  if(ex.type === 'reps'){
+    document.getElementById('weightLabel').textContent = 'Доп. вес, кг';
+    document.getElementById('inWeight').value = 0;
+  }else{
+    document.getElementById('weightLabel').textContent = 'Вес, кг';
+  }
+
+  loadProgression(ex.id);
+}
+
+// ---------- прошлый раз / подсказка / рекорд ----------
+async function loadProgression(exId){
+  try{
+    const p = await apiGet('/api/training/progression/' + exId);
+    document.getElementById('progHint').textContent = p.suggestion;
+    if(!p.has_history){
+      document.getElementById('progLast').textContent = '—';
+      document.getElementById('progRecord').textContent = '—';
+    }else{
+      document.getElementById('progLast').textContent = fmt(p.type, p.last);
+      document.getElementById('progRecord').textContent = p.record ? fmt(p.type, p.record) : '—';
+    }
+  }catch(err){}
+}
+
+function fmt(type, d){
+  if(!d) return '—';
+  const sets = d.sets ? d.sets + '×' : '';
+  if(type === 'weight'){
+    return sets + d.reps + ' · ' + (d.weight || 0) + ' кг';
+  }
+  const extra = d.weight ? ' (+' + d.weight + ' кг)' : '';
+  return sets + d.reps + extra;
+}
+
+// ---------- запись подхода ----------
+document.getElementById('logBtn').addEventListener('click', async (e)=>{
+  if(!currentEx) return;
+  const btn = e.target;
+  const data = {
+    exercise_id: currentEx.id,
+    sets: Number(document.getElementById('inSets').value),
+    reps: Number(document.getElementById('inReps').value),
+    weight: Number(document.getElementById('inWeight').value) || 0
+  };
+  btn.disabled = true; btn.textContent = '…';
+  try{
+    const res = await apiPost('/api/training/exercise-log', data);
+    if(res.is_pr){ showToast('🏆 Новый рекорд в «' + res.exercise + '»!'); }
+    else{ showToast('Подход записан ✓'); }
+    loadProgression(currentEx.id);
+    loadHistory();
+  }catch(err){
+    showToast('Не удалось записать подход');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Записать';
+  }
+});
+
+// ---------- история ----------
+async function loadHistory(){
+  let logs;
+  try{ logs = await apiGet('/api/training/exercise-logs'); }
+  catch(err){ return; }
+
+  const box = document.getElementById('history');
+  if(!logs.length){
+    box.innerHTML = '<div class="empty-hist">Пока пусто. Запиши первый подход выше.</div>';
+    return;
+  }
+  const byDate = {};
+  logs.forEach(l=>{ (byDate[l.date] = byDate[l.date] || []).push(l); });
+
+  box.innerHTML = '';
+  Object.keys(byDate).forEach(date=>{
+    const sess = document.createElement('div');
+    sess.className = 'session';
+    let html = '<div class="session-date">' + formatDate(date) + '</div>';
+    byDate[date].forEach(l=>{
+      html += '<div class="entry"><span class="ename">' + l.exercise_name + '</span>' +
+              '<span class="eval">' + fmt(l.type, l) + '</span></div>';
+    });
+    sess.innerHTML = html;
+    box.appendChild(sess);
+  });
+}
+
+function formatDate(iso){
+  try{
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+  }catch(e){ return iso; }
+}
+
+// старт
+loadLibrary();
+loadHistory();
+</script>
+</body>
+</html>

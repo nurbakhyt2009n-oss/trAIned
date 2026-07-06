@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>trAIned · Аналитика</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/style.css">
+
+<!-- Chart.js — библиотека графиков (из интернета) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+/* ====== СТИЛИ ТОЛЬКО ДЛЯ АНАЛИТИКИ ====== */
+.summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:24px; }
+.scard{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:inset 0 1px 0 rgba(255,255,255,.03); }
+.scard .k{ font-size:12px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; }
+.scard .v{ font-family:'JetBrains Mono',monospace; font-size:26px; color:var(--text); margin-top:10px; }
+.scard .v .u{ font-size:12px; color:var(--text-mute); margin-left:4px; }
+.scard .trend{ font-size:12px; margin-top:8px; display:inline-flex; align-items:center; gap:5px; }
+.trend.up{ color:var(--good); } .trend.down{ color:var(--bad); } .trend.flat{ color:var(--text-mute); }
+
+.chart-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:24px; margin-bottom:20px; box-shadow:inset 0 1px 0 rgba(255,255,255,.03); }
+.chart-head{ display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+.chart-head .ico{ color:var(--accent); display:grid; place-items:center; }
+.chart-head h2{ font-size:16px; font-weight:600; letter-spacing:-.01em; }
+.chart-head .meta{ margin-left:auto; font-size:12px; color:var(--text-mute); font-family:'JetBrains Mono',monospace; }
+.chart-box{ position:relative; height:240px; }
+.charts-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+.empty{ text-align:center; padding:80px 24px; color:var(--text-mute); }
+.empty .big{ font-family:'Unbounded',sans-serif; font-size:20px; color:var(--text-dim); margin-bottom:10px; }
+.empty a{ color:var(--accent); text-decoration:none; }
+.empty a:hover{ text-decoration:underline; }
+
+@media (max-width:860px){
+  .summary{ grid-template-columns:repeat(2,1fr); }
+  .charts-grid{ grid-template-columns:1fr; }
+}
+</style>
+</head>
+
+<body>
+
+<nav class="topbar">
+  <a class="brand" href="/">tr<span class="hl">AI</span>ned</a>
+  <div class="tabs">
+    <a class="tab" href="/dashboard.html">Дашборд</a>
+    <a class="tab" href="/workout.html">Журнал</a>
+    <a class="tab" href="/food.html">Еда</a>
+    <a class="tab active" href="/analytics.html">Аналитика</a>
+  </div>
+  <div class="top-right">
+    <a class="chat-link" href="/chat.html"><span class="dot"></span>AI-тренер</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="hello">
+    <span class="eyebrow">Прогресс</span>
+    <h1>Аналитика</h1>
+  </div>
+
+  <div id="content">
+    <div class="empty"><div class="big">Загружаем данные…</div></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+/* ====== ЛОГИКА АНАЛИТИКИ ====== */
+const FONT = "'Manrope', sans-serif";
+const COL_TEXT = '#8A8175';
+const COL_GRID = 'rgba(231,222,200,.06)';
+
+function lineDataset(label, data, color){
+  return {
+    label, data,
+    borderColor: color,
+    backgroundColor: color + '22',
+    borderWidth: 2.5,
+    pointBackgroundColor: color,
+    pointBorderColor: '#0F0E0B',
+    pointBorderWidth: 2,
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    tension: 0.35,
+    fill: true
+  };
+}
+
+function chartOptions(stepSize){
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#211D16',
+        borderColor: 'rgba(231,222,200,.2)',
+        borderWidth: 1,
+        titleColor: '#F4EFE4',
+        bodyColor: '#B9B0A0',
+        padding: 12,
+        displayColors: false
+      }
+    },
+    scales: {
+      x: { grid:{ color:COL_GRID }, ticks:{ color:COL_TEXT, font:{ family:FONT, size:11 } } },
+      y: { grid:{ color:COL_GRID }, ticks:{ color:COL_TEXT, font:{ family:FONT, size:11 }, stepSize }, beginAtZero:false }
+    }
+  };
+}
+
+function trend(arr){
+  if(arr.length < 2) return { dir:'flat', diff:0 };
+  const diff = arr[arr.length-1] - arr[0];
+  if(Math.abs(diff) < 0.01) return { dir:'flat', diff:0 };
+  return { dir: diff > 0 ? 'up' : 'down', diff: Math.abs(diff) };
+}
+function avg(arr){
+  if(!arr.length) return 0;
+  return arr.reduce((a,b)=>a+b,0) / arr.length;
+}
+
+async function load(){
+  let logs;
+  try{
+    logs = await apiGet('/api/training/logs');
+  }catch(err){
+    document.getElementById('content').innerHTML =
+      '<div class="empty"><div class="big">Сервер недоступен</div>Проверь, что запущен uvicorn.</div>';
+    return;
+  }
+
+  logs = (logs || []).filter(l => l.sleep_hours != null || l.weight != null || l.fatigue != null);
+
+  if(logs.length < 2){
+    document.getElementById('content').innerHTML =
+      '<div class="empty"><div class="big">Пока мало данных для графиков</div>' +
+      'Сделай хотя бы 2–3 чек-ина на дашборде (сон, вес, усталость),<br>' +
+      'и здесь появятся графики твоего прогресса.<br><br>' +
+      '<a href="/dashboard.html">← Перейти к чек-ину</a></div>';
+    return;
+  }
+
+  const labels   = logs.map(l => 'День ' + (l.day ?? ''));
+  const sleeps   = logs.map(l => l.sleep_hours);
+  const fatigues = logs.map(l => l.fatigue);
+  const weightPoints = logs.filter(l => l.weight != null).map(l => l.weight);
+
+  const wTrend = trend(weightPoints);
+  const avgSleep = avg(sleeps.filter(x=>x!=null));
+  const avgFatigue = avg(fatigues.filter(x=>x!=null));
+
+  function trendBadge(t, unit){
+    if(t.dir === 'flat') return '<span class="trend flat">→ без изменений</span>';
+    const arrow = t.dir === 'up' ? '↑' : '↓';
+    const cls = t.dir === 'up' ? 'up' : 'down';
+    return '<span class="trend ' + cls + '">' + arrow + ' ' + t.diff.toFixed(1) + ' ' + unit + '</span>';
+  }
+
+  document.getElementById('content').innerHTML =
+    '<div class="summary">' +
+      '<div class="scard"><div class="k">Записей</div><div class="v">' + logs.length + '</div><div class="trend flat">всего чек-инов</div></div>' +
+      '<div class="scard"><div class="k">Текущий вес</div><div class="v">' + (weightPoints.length ? weightPoints[weightPoints.length-1] : '—') + '<span class="u">кг</span></div>' + (weightPoints.length ? trendBadge(wTrend,'кг') : '<div class="trend flat">нет данных</div>') + '</div>' +
+      '<div class="scard"><div class="k">Средний сон</div><div class="v">' + avgSleep.toFixed(1) + '<span class="u">ч</span></div><div class="trend ' + (avgSleep>=7?'up':'down') + '">' + (avgSleep>=7?'норма':'мало') + '</div></div>' +
+      '<div class="scard"><div class="k">Средняя усталость</div><div class="v">' + avgFatigue.toFixed(1) + '<span class="u">/10</span></div><div class="trend ' + (avgFatigue<=5?'up':'down') + '">' + (avgFatigue<=5?'ок':'высокая') + '</div></div>' +
+    '</div>' +
+    '<div class="chart-card">' +
+      '<div class="chart-head"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 4 8-8M21 8v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2>Динамика веса</h2><span class="meta">' + weightPoints.length + ' точек</span></div>' +
+      '<div class="chart-box"><canvas id="weightChart"></canvas></div>' +
+    '</div>' +
+    '<div class="charts-grid">' +
+      '<div class="chart-card"><div class="chart-head"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2>Сон</h2></div><div class="chart-box"><canvas id="sleepChart"></canvas></div></div>' +
+      '<div class="chart-card"><div class="chart-head"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2>Усталость</h2></div><div class="chart-box"><canvas id="fatigueChart"></canvas></div></div>' +
+    '</div>';
+
+  const wLabels = logs.filter(l=>l.weight!=null).map(l=>'День '+(l.day ?? ''));
+  new Chart(document.getElementById('weightChart'), {
+    type:'line',
+    data:{ labels:wLabels, datasets:[ lineDataset('Вес, кг', weightPoints, '#C8A86A') ] },
+    options: chartOptions(1)
+  });
+  new Chart(document.getElementById('sleepChart'), {
+    type:'line',
+    data:{ labels, datasets:[ lineDataset('Сон, ч', sleeps, '#9BC48A') ] },
+    options: chartOptions(2)
+  });
+  new Chart(document.getElementById('fatigueChart'), {
+    type:'line',
+    data:{ labels, datasets:[ lineDataset('Усталость', fatigues, '#D6826E') ] },
+    options: chartOptions(2)
+  });
+}
+
+load();
+</script>
+</body>
+</html>
