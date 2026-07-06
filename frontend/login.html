@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>trAIned · Вход</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/style.css">
+
+<style>
+/* ====== СТИЛИ ТОЛЬКО ДЛЯ ВХОДА ====== */
+body{ display:grid; place-items:center; min-height:100vh; padding:24px; }
+.auth-card{
+  position:relative; z-index:1; width:100%; max-width:400px;
+  background:var(--surface); border:1px solid var(--line-strong); border-radius:20px; padding:40px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 40px 80px -40px rgba(0,0,0,.9);
+}
+.auth-brand{ font-family:'Unbounded',sans-serif; font-weight:600; font-size:28px; letter-spacing:-.02em; text-align:center; }
+.auth-brand .hl{ color:var(--accent); }
+.auth-sub{ text-align:center; color:var(--text-mute); font-size:13px; margin-top:8px; }
+
+.mode-tabs{ display:flex; gap:8px; margin:28px 0 22px; }
+.mode-tab{
+  flex:1; border:1px solid var(--line); background:var(--bg-2); color:var(--text-dim);
+  padding:11px; border-radius:var(--radius-sm); cursor:pointer;
+  font-family:'Manrope',sans-serif; font-size:14px; font-weight:500; transition:all .2s var(--ease);
+}
+.mode-tab.active{ border-color:var(--accent); color:var(--text); background:linear-gradient(180deg, rgba(200,168,106,.14), rgba(200,168,106,.05)); }
+
+.auth-form{ display:flex; flex-direction:column; gap:16px; }
+.auth-form .btn{ margin-top:6px; padding:15px; }
+.auth-err{ display:none; padding:12px 15px; border:1px solid rgba(214,130,110,.4); background:rgba(214,130,110,.08); border-radius:var(--radius-sm); color:#E5B5A8; font-size:13px; }
+.auth-err.show{ display:block; }
+.auth-hint{ text-align:center; font-size:12px; color:var(--text-mute); margin-top:18px; line-height:1.6; }
+</style>
+</head>
+
+<body>
+<div class="auth-card">
+  <div class="auth-brand">tr<span class="hl">AI</span>ned</div>
+  <p class="auth-sub">Личный AI-тренер. Войди или создай аккаунт.</p>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabLogin">Вход</button>
+    <button class="mode-tab" id="tabRegister">Регистрация</button>
+  </div>
+
+  <div class="auth-form">
+    <div class="field">
+      <span class="label">Логин</span>
+      <input class="input" type="text" id="inUser" placeholder="Придумай логин" autocomplete="username">
+    </div>
+    <div class="field">
+      <span class="label">Пароль</span>
+      <input class="input" type="password" id="inPass" placeholder="Минимум 4 символа" autocomplete="current-password">
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <button class="btn" id="goBtn">Войти</button>
+  </div>
+
+  <p class="auth-hint">Твои данные видишь только ты.<br>Пароль хранится в захэшированном виде.</p>
+</div>
+
+<script src="/app.js"></script>
+<script>
+/* ====== ЛОГИКА ВХОДА / РЕГИСТРАЦИИ ====== */
+let mode = 'login';
+
+// уже вошёл? — сразу в приложение
+if(getToken()){ location.replace('/dashboard.html'); }
+
+const tabL = document.getElementById('tabLogin');
+const tabR = document.getElementById('tabRegister');
+const goBtn = document.getElementById('goBtn');
+const err = document.getElementById('authErr');
+
+function setMode(m){
+  mode = m;
+  tabL.classList.toggle('active', m === 'login');
+  tabR.classList.toggle('active', m === 'register');
+  goBtn.textContent = m === 'login' ? 'Войти' : 'Создать аккаунт';
+  err.classList.remove('show');
+}
+tabL.addEventListener('click', ()=> setMode('login'));
+tabR.addEventListener('click', ()=> setMode('register'));
+
+async function go(){
+  const username = document.getElementById('inUser').value.trim();
+  const password = document.getElementById('inPass').value;
+  err.classList.remove('show');
+
+  if(username.length < 3){ return showErr('Логин — минимум 3 символа'); }
+  if(password.length < 4){ return showErr('Пароль — минимум 4 символа'); }
+
+  goBtn.disabled = true;
+  goBtn.textContent = '…';
+  try{
+    const data = await apiPost('/api/auth/' + mode, { username, password });
+    setToken(data.token);
+    // после регистрации — на онбординг, после входа — в дашборд
+    location.replace(mode === 'register' ? '/' : '/dashboard.html');
+  }catch(e){
+    showErr(e.message || 'Что-то пошло не так');
+    goBtn.disabled = false;
+    goBtn.textContent = mode === 'login' ? 'Войти' : 'Создать аккаунт';
+  }
+}
+
+function showErr(msg){
+  err.textContent = msg;
+  err.classList.add('show');
+}
+
+goBtn.addEventListener('click', go);
+document.getElementById('inPass').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') go(); });
+document.getElementById('inUser').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') go(); });
+</script>
+</body>
+</html>

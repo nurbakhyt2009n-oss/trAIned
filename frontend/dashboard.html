@@ -229,7 +229,7 @@ tabs.forEach(tab=>{
 
 async function loadProfile(){
   try{
-    const res = await fetch('/api/profile');
+    const res = await fetch('/api/profile', { headers: authHeaders() });
     if(res.status === 404){
       document.querySelector('.wrap').innerHTML =
         '<div class="empty-state">Профиль ещё не создан.<br><br><a href="/">Заполнить онбординг →</a></div>';
@@ -273,7 +273,7 @@ function paintRing(score){
 }
 async function loadRecovery(){
   try{
-    const res = await fetch('/api/recovery');
+    const res = await fetch('/api/recovery', { headers: authHeaders() });
     if(res.status === 404){
       document.getElementById('recoveryVal').textContent = '—';
       return;

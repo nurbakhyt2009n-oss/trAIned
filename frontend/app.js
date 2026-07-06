@@ -1,5 +1,5 @@
 /* =========================================================
-   trAIned — ОБЩИЕ ПОМОЩНИКИ
+   trAIned — ОБЩИЕ ПОМОЩНИКИ (+ авторизация)
    Подключается на каждой странице ПЕРЕД её собственным скриптом.
    ========================================================= */
 
@@ -28,7 +28,42 @@ const ACTIVITY_LABELS = {
   very_active: "Очень высокая"
 };
 
-// всплывающее уведомление — само создаёт элемент, если его нет на странице
+/* ---------- АВТОРИЗАЦИЯ ---------- */
+function getToken(){ return localStorage.getItem('trained_token'); }
+function setToken(t){ localStorage.setItem('trained_token', t); }
+function clearToken(){ localStorage.removeItem('trained_token'); }
+function authHeaders(){
+  const t = getToken();
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+// охрана страниц: без токена — на страницу входа (кроме самой login.html)
+(function(){
+  const onLogin = location.pathname.endsWith('/login.html');
+  if(!onLogin && !getToken()){
+    location.replace('/login.html');
+  }
+})();
+
+// кнопка «Выйти» добавляется в шапку автоматически
+document.addEventListener('DOMContentLoaded', ()=>{
+  const right = document.querySelector('.top-right');
+  if(right && getToken()){
+    const b = document.createElement('button');
+    b.className = 'tab';
+    b.textContent = 'Выйти';
+    b.style.cursor = 'pointer';
+    b.title = 'Выйти из аккаунта';
+    b.addEventListener('click', async ()=>{
+      try{ await apiPost('/api/auth/logout', null); }catch(e){}
+      clearToken();
+      location.replace('/login.html');
+    });
+    right.appendChild(b);
+  }
+});
+
+/* ---------- УВЕДОМЛЕНИЕ ---------- */
 function showToast(msg){
   let t = document.getElementById('toast');
   if(!t){
@@ -43,29 +78,38 @@ function showToast(msg){
   t._timer = setTimeout(() => t.classList.remove('show'), 2800);
 }
 
-// ---------- обёртки для запросов к API ----------
-// Бросают ошибку, если сервер ответил не ОК — её удобно ловить через try/catch.
-async function apiGet(path){
-  const res = await fetch(path);
-  if(!res.ok) throw new Error('HTTP ' + res.status);
+/* ---------- ОБЁРТКИ ДЛЯ API ---------- */
+async function handleResponse(res){
+  if(res.status === 401 && !location.pathname.endsWith('/login.html')){
+    clearToken();
+    location.replace('/login.html');
+    throw new Error('Требуется вход');
+  }
+  if(!res.ok){
+    const err = await res.json().catch(() => ({}));
+    const msg = typeof err.detail === 'string' ? err.detail
+              : err.detail ? JSON.stringify(err.detail)
+              : 'HTTP ' + res.status;
+    throw new Error(msg);
+  }
   return res.json();
+}
+
+async function apiGet(path){
+  const res = await fetch(path, { headers: authHeaders() });
+  return handleResponse(res);
 }
 
 async function apiPost(path, body){
   const res = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
     body: body ? JSON.stringify(body) : undefined
   });
-  if(!res.ok){
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail ? JSON.stringify(err.detail) : 'HTTP ' + res.status);
-  }
-  return res.json();
+  return handleResponse(res);
 }
 
 async function apiDelete(path){
-  const res = await fetch(path, { method: 'DELETE' });
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+  const res = await fetch(path, { method: 'DELETE', headers: authHeaders() });
+  return handleResponse(res);
 }

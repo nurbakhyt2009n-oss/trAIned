@@ -7,8 +7,14 @@ DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'trained.db')
 def get_connection():
     """Подключение к базе данных"""
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # чтобы результаты были как словари
+    conn.row_factory = sqlite3.Row
     return conn
+
+def _ensure_column(cursor, table, column, decl):
+    """Мягкая миграция: добавить колонку, если её ещё нет (для старых баз)."""
+    cols = [r["name"] for r in cursor.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in cols:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 def init_db():
     """Создание всех таблиц при первом запуске"""
@@ -16,11 +22,31 @@ def init_db():
     cursor = conn.cursor()
 
     # ===============================
-    # ТАБЛИЦА: ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ
+    # ПОЛЬЗОВАТЕЛИ И СЕССИИ (мультипользовательский режим)
+    # ===============================
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # ===============================
+    # ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ
     # ===============================
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS profile (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             name TEXT NOT NULL,
             age INTEGER,
             gender TEXT,
@@ -37,11 +63,12 @@ def init_db():
     """)
 
     # ===============================
-    # ТАБЛИЦА: ДНЕВНИК (сон/усталость/вес)
+    # ДНЕВНИК (сон/усталость/вес)
     # ===============================
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS training_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             day INTEGER,
             sleep_hours REAL,
             fatigue INTEGER,
@@ -52,11 +79,12 @@ def init_db():
     """)
 
     # ===============================
-    # ТАБЛИЦА: ПИТАНИЕ ЗА ДЕНЬ
+    # ПИТАНИЕ ЗА ДЕНЬ
     # ===============================
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS nutrition_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             date TEXT,
             calories REAL,
             protein REAL,
@@ -69,11 +97,12 @@ def init_db():
     """)
 
     # ===============================
-    # ТАБЛИЦА: ИСТОРИЯ ЧАТА С AI
+    # ИСТОРИЯ ЧАТА С AI
     # ===============================
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -81,12 +110,12 @@ def init_db():
     """)
 
     # ===============================
-    # ТАБЛИЦА: ЖУРНАЛ ТРЕНИРОВОК (упражнения/подходы/веса)
-    # Каждая строка — одно упражнение в один день: подходы × повторы × вес.
+    # ЖУРНАЛ ТРЕНИРОВОК (упражнения/подходы/веса)
     # ===============================
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS workout_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
             date TEXT,
             exercise_id TEXT,
             exercise_name TEXT,
@@ -99,21 +128,19 @@ def init_db():
         )
     """)
 
+    # Мягкая миграция старых баз: добавляем user_id, если таблицы были без него
+    for t in ["profile", "training_log", "nutrition_log", "chat_history", "workout_log"]:
+        _ensure_column(cursor, t, "user_id", "INTEGER")
+
     conn.commit()
     conn.close()
     print("✅ База данных инициализирована")
 
-# Запускаем создание таблиц при импорте
 if __name__ == "__main__":
     init_db()
-    print("Таблицы созданы:")
-
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    tables = cursor.fetchall()
-
-    for table in tables:
+    for table in cursor.fetchall():
         print(f"  - {table['name']}")
-
     conn.close()
