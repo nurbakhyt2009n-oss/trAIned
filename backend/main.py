@@ -18,18 +18,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 try:
-    from backend.database import get_connection, init_db
+    from backend.database import get_connection, init_db, DB_ERRORS
     from backend.calculations import get_full_nutrition_plan
     from backend.ai_coach import get_ai_response, generate_workout_plan, generate_meal_plan, analyze_food_photo, analyze_food_text
     from backend.exercises import get_exercise, get_grouped, suggest_progression
 except ImportError:
-    from database import get_connection, init_db
+    from database import get_connection, init_db, DB_ERRORS
     from calculations import get_full_nutrition_plan
     from ai_coach import get_ai_response, generate_workout_plan, generate_meal_plan, analyze_food_photo, analyze_food_text
     from exercises import get_exercise, get_grouped, suggest_progression
 
 
-app = FastAPI(title="trAIned API", version="2.0")
+app = FastAPI(title="trAIned API", version="2.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,9 +58,12 @@ def get_db():
         conn.close()
 
 
-@app.exception_handler(sqlite3.Error)
 async def db_error_handler(request, exc):
     return JSONResponse(status_code=500, content={"detail": "Ошибка базы данных. Попробуй ещё раз."})
+
+# регистрируем обработчик для ошибок и SQLite, и Postgres
+for _exc in DB_ERRORS:
+    app.add_exception_handler(_exc, db_error_handler)
 
 
 # ===============================
@@ -242,11 +245,13 @@ def register(body: AuthIn):
         exists = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if exists:
             raise HTTPException(status_code=409, detail="Такой логин уже занят")
-        cur = conn.execute(
+        conn.execute(
             "INSERT INTO users (username, password_hash) VALUES (?, ?)",
             (username, hash_password(body.password)),
         )
-        user_id = cur.lastrowid
+        user_id = conn.execute(
+            "SELECT id FROM users WHERE username = ?", (username,)
+        ).fetchone()["id"]
         token = secrets.token_hex(32)
         conn.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token, user_id))
     return {"token": token, "username": username}
