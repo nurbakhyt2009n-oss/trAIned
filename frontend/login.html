@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>trAIned · Вход</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,6 +37,16 @@ body{ display:grid; place-items:center; min-height:100vh; padding:24px; }
 .auth-err{ display:none; padding:12px 15px; border:1px solid rgba(214,130,110,.4); background:rgba(214,130,110,.08); border-radius:var(--radius-sm); color:#E5B5A8; font-size:13px; }
 .auth-err.show{ display:block; }
 .auth-hint{ text-align:center; font-size:12px; color:var(--text-mute); margin-top:18px; line-height:1.6; }
+.pass-wrap{ position:relative; }
+.pass-wrap .input{ padding-right:48px; width:100%; }
+.eye{ position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer;
+  color:var(--text-mute); padding:6px; display:grid; place-items:center; border-radius:6px; }
+.eye:hover{ color:var(--text); }
+.rules{ display:none; flex-direction:column; gap:4px; font-size:12px; color:var(--text-mute); margin-top:2px; }
+.rules.show{ display:flex; }
+.rules .ok{ color:var(--good); }
+.rules span::before{ content:"·"; display:inline-block; width:12px; }
+.hidden{ display:none; }
 </style>
 </head>
 
@@ -52,17 +63,30 @@ body{ display:grid; place-items:center; min-height:100vh; padding:24px; }
   <div class="auth-form">
     <div class="field">
       <span class="label">Логин</span>
-      <input class="input" type="text" id="inUser" placeholder="Придумай логин" autocomplete="username">
+      <input class="input" type="text" id="inUser" placeholder="Например: nurik_fit" autocomplete="username" autocapitalize="off" spellcheck="false">
     </div>
     <div class="field">
       <span class="label">Пароль</span>
-      <input class="input" type="password" id="inPass" placeholder="Минимум 4 символа" autocomplete="current-password">
+      <div class="pass-wrap">
+        <input class="input" type="password" id="inPass" placeholder="Твой пароль" autocomplete="current-password">
+        <button class="eye" type="button" id="eyeBtn" title="Показать пароль" aria-label="Показать пароль">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>
+      </div>
+      <div class="rules" id="rules">
+        <span id="rLen">минимум 8 символов</span>
+        <span id="rMix">буквы и цифры</span>
+      </div>
+    </div>
+    <div class="field hidden" id="confirmField">
+      <span class="label">Повтори пароль</span>
+      <input class="input" type="password" id="inPass2" placeholder="Ещё раз" autocomplete="new-password">
     </div>
     <div class="auth-err" id="authErr"></div>
     <button class="btn" id="goBtn">Войти</button>
   </div>
 
-  <p class="auth-hint">Твои данные видишь только ты.<br>Пароль хранится в захэшированном виде.</p>
+  <p class="auth-hint">Твои данные видишь только ты.<br>Пароль хранится только в виде хэша — его не знает даже администратор.</p>
 </div>
 
 <script src="/app.js"></script>
@@ -78,23 +102,55 @@ const tabR = document.getElementById('tabRegister');
 const goBtn = document.getElementById('goBtn');
 const err = document.getElementById('authErr');
 
+const inPass = document.getElementById('inPass');
+const inPass2 = document.getElementById('inPass2');
+
 function setMode(m){
   mode = m;
-  tabL.classList.toggle('active', m === 'login');
-  tabR.classList.toggle('active', m === 'register');
-  goBtn.textContent = m === 'login' ? 'Войти' : 'Создать аккаунт';
+  const reg = m === 'register';
+  tabL.classList.toggle('active', !reg);
+  tabR.classList.toggle('active', reg);
+  goBtn.textContent = reg ? 'Создать аккаунт' : 'Войти';
+  document.getElementById('confirmField').classList.toggle('hidden', !reg);
+  document.getElementById('rules').classList.toggle('show', reg);
+  inPass.placeholder = reg ? 'Придумай пароль' : 'Твой пароль';
+  inPass.autocomplete = reg ? 'new-password' : 'current-password';
   err.classList.remove('show');
+  checkRules();
 }
+
+const hasLen = p => p.length >= 8;
+const hasMix = p => /[A-Za-zА-Яа-яЁё]/.test(p) && /\d/.test(p);
+function checkRules(){
+  const p = inPass.value;
+  document.getElementById('rLen').classList.toggle('ok', hasLen(p));
+  document.getElementById('rMix').classList.toggle('ok', hasMix(p));
+}
+inPass.addEventListener('input', checkRules);
+
+document.getElementById('eyeBtn').addEventListener('click', ()=>{
+  const show = inPass.type === 'password';
+  inPass.type = inPass2.type = show ? 'text' : 'password';
+  document.getElementById('eyeBtn').title = show ? 'Скрыть пароль' : 'Показать пароль';
+});
 tabL.addEventListener('click', ()=> setMode('login'));
 tabR.addEventListener('click', ()=> setMode('register'));
 
 async function go(){
   const username = document.getElementById('inUser').value.trim();
-  const password = document.getElementById('inPass').value;
+  const password = inPass.value;
   err.classList.remove('show');
 
-  if(username.length < 3){ return showErr('Логин — минимум 3 символа'); }
-  if(password.length < 4){ return showErr('Пароль — минимум 4 символа'); }
+  if(!username){ return showErr('Введи логин'); }
+  if(!password){ return showErr('Введи пароль'); }
+  if(mode === 'register'){
+    if(!/^[a-zA-Z0-9_.-]{3,30}$/.test(username)){
+      return showErr('Логин: 3–30 символов, латинские буквы, цифры, точка, _ или -');
+    }
+    if(!hasLen(password)){ return showErr('Пароль — минимум 8 символов'); }
+    if(!hasMix(password)){ return showErr('Пароль должен содержать буквы и цифры'); }
+    if(password !== inPass2.value){ return showErr('Пароли не совпадают'); }
+  }
 
   goBtn.disabled = true;
   goBtn.textContent = '…';
@@ -116,7 +172,8 @@ function showErr(msg){
 }
 
 goBtn.addEventListener('click', go);
-document.getElementById('inPass').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') go(); });
+inPass.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') go(); });
+inPass2.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') go(); });
 document.getElementById('inUser').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') go(); });
 </script>
 </body>

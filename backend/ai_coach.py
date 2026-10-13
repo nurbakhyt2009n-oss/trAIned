@@ -2,6 +2,7 @@
 # AI ТРЕНЕР — МОЗГ ПРИЛОЖЕНИЯ
 # ===============================
 import os
+import re
 import json
 from groq import Groq
 from dotenv import load_dotenv
@@ -19,9 +20,79 @@ if not GROQ_API_KEY:
 # timeout=30 — если Groq не ответит за 30 секунд, получим ошибку, а не вечное ожидание
 client = Groq(api_key=GROQ_API_KEY, timeout=30.0)
 
-# модели в одном месте — легко поменять
-MODEL = "llama-3.3-70b-versatile"                          # текст
-VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"  # фото (vision)
+# Модели Groq. Groq периодически выключает старые модели (llama-3.3 и llama-4-scout
+# отключены летом 2026), поэтому имена можно поменять в .env / на Render без правки кода:
+#   GROQ_TEXT_MODEL=...   GROQ_VISION_MODEL=...
+# Список актуальных моделей: https://console.groq.com/docs/models
+def _models(env_name, defaults):
+    custom = [m.strip() for m in os.getenv(env_name, "").split(",") if m.strip()]
+    return custom + [m for m in defaults if m not in custom]
+
+
+TEXT_MODELS = _models("GROQ_TEXT_MODEL", ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"])
+VISION_MODELS = _models("GROQ_VISION_MODEL", ["qwen/qwen3.8-27b"])
+
+
+def _reasoning_params(model):
+    """Новые модели Groq «думают» перед ответом — отключаем/урезаем это, чтобы ответ был быстрым."""
+    if "gpt-oss" in model:
+        return {"reasoning_effort": "low", "include_reasoning": False}
+    if "qwen" in model:
+        return {"reasoning_effort": "none"}
+    return {}
+
+
+def _complete(models, messages, max_tokens, temperature, json_mode=False):
+    """Запрос к Groq с запасными моделями. Возвращает текст ответа или бросает исключение."""
+    last_error = None
+    for model in models:
+        extra = _reasoning_params(model)
+        # у reasoning-моделей лимит включает «мысли» — даём запас
+        limit = max_tokens + (1500 if "gpt-oss" in model else 0)
+        kwargs = dict(model=model, messages=messages, temperature=temperature, max_tokens=limit)
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        for attempt_extra in (extra, {}):        # если параметр не поддерживается — пробуем без него
+            try:
+                resp = client.chat.completions.create(**kwargs, extra_body=attempt_extra or None)
+                text = _strip_thinking(resp.choices[0].message.content or "")
+                if text:
+                    return text
+                last_error = RuntimeError(f"{model}: empty response")
+                break
+            except Exception as e:
+                last_error = e
+                msg = str(e).lower()
+                if attempt_extra and ("reasoning" in msg or "unsupported" in msg or "invalid" in msg):
+                    continue                     # повторить без reasoning-параметров
+                break                            # модель недоступна — следующая модель
+        print(f"[ai] model {model} failed: {last_error}")
+    raise last_error or RuntimeError("no models configured")
+
+
+def _strip_thinking(text):
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+
+
+def _parse_food_json(text):
+    """JSON с оценкой еды: терпим ```json-обёртки и лишний текст, приводим числа."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        m = re.search(r"\{.*\}", text, flags=re.S)
+        if not m:
+            raise
+        data = json.loads(m.group(0))
+    for key in ("calories", "protein", "fat", "carbs"):
+        val = data.get(key, 0)
+        if isinstance(val, str):
+            num = re.search(r"\d+(?:[.,]\d+)?", val)
+            val = float(num.group(0).replace(",", ".")) if num else 0
+        data[key] = round(float(val or 0))
+    data.setdefault("dish", "Блюдо")
+    data.setdefault("confidence", "medium")
+    data.setdefault("note", "")
+    return data
 
 
 def build_system_prompt(profile, latest_log, weekly_stats, nutrition_plan):
@@ -30,7 +101,8 @@ def build_system_prompt(profile, latest_log, weekly_stats, nutrition_plan):
     prompt = """Ты — персональный AI тренер и нутрициолог. 
 Твоя задача — давать конкретные, персонализированные советы основанные на реальных данных атлета.
 Отвечай на русском языке. Будь прямым, конкретным, как опытный тренер — без воды.
-Не ставь медицинские диагнозы. При травмах и болях отправляй к врачу.\n\n"""
+Не ставь медицинские диагнозы. При травмах и болях отправляй к врачу.
+Пиши простым текстом, без эмодзи.\n\n"""
 
     if profile:
         prompt += f"""ПРОФИЛЬ АТЛЕТА:
@@ -81,16 +153,24 @@ def get_ai_response(user_message, chat_history, profile=None, latest_log=None,
     messages.append({"role": "user", "content": user_message})
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL, messages=messages, max_tokens=600, temperature=0.7
-        )
-        return response.choices[0].message.content
+        return _complete(TEXT_MODELS, messages, max_tokens=700, temperature=0.7)
     except Exception as e:
-        return f"Ошибка AI: {str(e)}"
+        print(f"[ai] chat error: {e}")
+        return "Тренер сейчас недоступен. Попробуй ещё раз через минуту."
 
 
-def generate_workout_plan(profile, latest_log):
-    """Генерация тренировки на сегодня"""
+def _format_planned(planned):
+    lines = []
+    for e in planned.get("exercises", []):
+        line = f"- {e['name']}: {e['sets']} x {e['reps']} {e.get('unit', '')}".rstrip()
+        if e.get("hint"):
+            line += f" ({e['hint']})"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def generate_workout_plan(profile, latest_log, planned=None):
+    """Тренировка на сегодня. Если есть программа — адаптирует запланированный день."""
     fatigue = latest_log.get('fatigue', 5) if latest_log else 5
     sleep = latest_log.get('sleep_hours', 7) if latest_log else 7
     goal = profile.get('goal', 'muscle_gain') if profile else 'muscle_gain'
@@ -104,6 +184,7 @@ def generate_workout_plan(profile, latest_log):
 - Усталость: {fatigue}/10
 - Сон: {sleep} часов
 - Цель: {goal}
+- Уровень: {profile.get('experience', '—') if profile else '—'}
 - Макс подтягивания: {pullups} раз
 - Жим лёжа 1ПМ: {bench} кг
 - Травмы: {injuries}
@@ -114,17 +195,25 @@ def generate_workout_plan(profile, latest_log):
 3. Основная часть (4-6 упражнений с подходами и повторениями)
 4. Заминка
 5. Одна ключевая рекомендация на сегодня
+Пиши простым текстом, без эмодзи.
 
 Если усталость выше 7 или сон меньше 6 часов — предложи лёгкую восстановительную тренировку или отдых."""
 
+    if planned and planned.get("exercises"):
+        prompt += f"""
+
+По программе атлета сегодня: {planned.get('name')} ({planned.get('focus')}).
+{_format_planned(planned)}
+
+Не придумывай новую тренировку: возьми этот план и адаптируй под сон и усталость
+(можно уменьшить подходы, вес или заменить упражнение). Объясни, что изменил и почему."""
+
     try:
-        response = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=700, temperature=0.6
-        )
-        return response.choices[0].message.content
+        return _complete(TEXT_MODELS, [{"role": "user", "content": prompt}],
+                         max_tokens=900, temperature=0.6)
     except Exception as e:
-        return f"Ошибка генерации тренировки: {str(e)}"
+        print(f"[ai] workout error: {e}")
+        return "Не удалось составить тренировку. Попробуй ещё раз через минуту."
 
 
 def generate_meal_plan(nutrition_plan, preferences="обычное питание"):
@@ -149,16 +238,14 @@ def generate_meal_plan(nutrition_plan, preferences="обычное питани�
 - Ужин (с граммовками)
 - Итого КБЖУ
 
-Используй простые, доступные продукты."""
+Используй простые, доступные продукты. Без эмодзи."""
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=700, temperature=0.6
-        )
-        return response.choices[0].message.content
+        return _complete(TEXT_MODELS, [{"role": "user", "content": prompt}],
+                         max_tokens=900, temperature=0.6)
     except Exception as e:
-        return f"Ошибка генерации меню: {str(e)}"
+        print(f"[ai] meal plan error: {e}")
+        return "Не удалось составить меню. Попробуй ещё раз через минуту."
 
 
 def analyze_food_photo(image_data_url):
@@ -185,64 +272,17 @@ def analyze_food_photo(image_data_url):
 }"""
 
     try:
-        response = client.chat.completions.create(
-            model=VISION_MODEL,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_data_url}},
-                ],
-            }],
-            temperature=0.3,
-            max_tokens=500,
-            response_format={"type": "json_object"},
-        )
-        raw = response.choices[0].message.content
-        data = json.loads(raw)
-        return {"ok": True, "data": data}
+        messages = [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ],
+        }]
+        text = _complete(VISION_MODELS, messages, max_tokens=500, temperature=0.3, json_mode=True)
+        return {"ok": True, "data": _parse_food_json(text)}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-def estimate_food_text(description):
-    """
-    Оценить КБЖУ по текстовому описанию еды (название + количество/порция).
-    Возвращает {"ok": True, "data": {...}} или {"ok": False, "error": "..."}.
-    """
-    prompt = f"""Ты — нутрициолог. Пользователь описал съеденное словами:
-"{description}"
-
-Могут встречаться блюда Центральной Азии и Казахстана (бешбармак, плов, манты, лагман, самса, баурсаки).
-Правила оценки:
-- Если указан вес в граммах — считай по нему.
-- Если указан размер порции (маленькая/средняя/большая) — оцени реалистично.
-- Если количество не указано — бери среднюю порцию.
-- Если перечислено несколько продуктов — просуммируй.
-Это оценка, не точный анализ.
-
-Верни СТРОГО валидный JSON без пояснений и markdown:
-{{
-  "dish": "краткое название на русском",
-  "calories": число_ккал,
-  "protein": число_грамм,
-  "fat": число_грамм,
-  "carbs": число_грамм,
-  "confidence": "high" или "medium" или "low",
-  "note": "короткий комментарий одним предложением"
-}}"""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=400,
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(response.choices[0].message.content)
-        return {"ok": True, "data": data}
-    except Exception as e:
+        print(f"[ai] photo error: {e}")
         return {"ok": False, "error": str(e)}
 
 
@@ -268,16 +308,11 @@ def analyze_food_text(description):
 }}"""
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=400,
-            response_format={"type": "json_object"},
-        )
-        data = json.loads(response.choices[0].message.content)
-        return {"ok": True, "data": data}
+        text = _complete(TEXT_MODELS, [{"role": "user", "content": prompt}],
+                         max_tokens=400, temperature=0.3, json_mode=True)
+        return {"ok": True, "data": _parse_food_json(text)}
     except Exception as e:
+        print(f"[ai] food text error: {e}")
         return {"ok": False, "error": str(e)}
 
 

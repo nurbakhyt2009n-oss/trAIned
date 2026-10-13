@@ -116,7 +116,7 @@ if __name__ == "__main__":
         goal="muscle_gain"
     )
 
-    print("📊 Твой план питания:")
+    print("План питания:")
     print(f"  BMR (базовый обмен):     {result['bmr']} ккал")
     print(f"  TDEE (с активностью):    {result['tdee']} ккал")
     print(f"  Цель (профицит):         {result['target_calories']} ккал")

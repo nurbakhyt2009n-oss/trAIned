@@ -19,6 +19,9 @@ if USE_POSTGRES:
 else:
     DBError = sqlite3.Error
 
+# все ошибки БД, которые main.py превращает в понятный ответ 500
+DB_ERRORS = (DBError,) if DBError is sqlite3.Error else (DBError, sqlite3.Error)
+
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'trained.db')
 
 
@@ -97,6 +100,8 @@ def init_db():
             injuries TEXT,
             pullups_max INTEGER DEFAULT 0,
             bench_max REAL DEFAULT 0,
+            days_per_week INTEGER,
+            equipment TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         f"""CREATE TABLE IF NOT EXISTS training_log (
@@ -141,24 +146,37 @@ def init_db():
             notes TEXT,
             logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
+        """CREATE TABLE IF NOT EXISTS user_visits (
+            user_id INTEGER NOT NULL,
+            day TEXT NOT NULL,
+            PRIMARY KEY (user_id, day)
+        )""",
+        f"""CREATE TABLE IF NOT EXISTS training_plan (
+            id {pk},
+            user_id INTEGER NOT NULL,
+            created_on TEXT NOT NULL,
+            plan_json TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
 
     for t in tables:
         conn.execute(t)
 
-    # мягкая миграция user_id для старых баз
-    data_tables = ["profile", "training_log", "nutrition_log", "chat_history", "workout_log"]
-    if USE_POSTGRES:
-        for t in data_tables:
-            conn.execute(f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS user_id INTEGER")
-    else:
-        for t in data_tables:
-            _ensure_column_sqlite(conn, t, "user_id", "INTEGER")
+    # мягкая миграция для баз, созданных старыми версиями
+    new_columns = [(t, "user_id", "INTEGER") for t in
+                   ["profile", "training_log", "nutrition_log", "chat_history", "workout_log"]]
+    new_columns += [("profile", "days_per_week", "INTEGER"), ("profile", "equipment", "TEXT")]
+    for table, column, decl in new_columns:
+        if USE_POSTGRES:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {decl}")
+        else:
+            _ensure_column_sqlite(conn, table, column, decl)
 
     conn.commit()
     conn.close()
-    print(f"✅ База данных инициализирована ({'PostgreSQL/Neon' if USE_POSTGRES else 'SQLite локально'})")
+    print(f"[db] ready: {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
 
 
 if __name__ == "__main__":
-    init_db() 
+    init_db()

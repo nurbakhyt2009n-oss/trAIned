@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>trAIned · Журнал тренировок</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -90,6 +91,7 @@
   <a class="brand" href="/">tr<span class="hl">AI</span>ned</a>
   <div class="tabs">
     <a class="tab" href="/dashboard.html">Дашборд</a>
+    <a class="tab" href="/plan.html">Программа</a>
     <a class="tab active" href="/workout.html">Журнал</a>
     <a class="tab" href="/food.html">Еда</a>
     <a class="tab" href="/analytics.html">Аналитика</a>
@@ -144,7 +146,8 @@
     <div class="section-gap">
       <a class="btn btn-ghost" id="videoBtn" href="#" target="_blank" rel="noopener"
          style="text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
-        ▶ Смотреть технику (видео)
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 5l12 7-12 7V5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        Смотреть технику (видео)
       </a>
     </div>
 
@@ -152,7 +155,7 @@
     <div class="prog-grid">
       <div class="prog-card"><div class="pk">Прошлый раз</div><div class="pv" id="progLast">—</div></div>
       <div class="prog-card hint"><div class="pk">Подсказка</div><div class="pv" id="progHint">—</div></div>
-      <div class="prog-card record"><div class="pk">Рекорд 🏆</div><div class="pv" id="progRecord">—</div></div>
+      <div class="prog-card record"><div class="pk">Рекорд</div><div class="pv" id="progRecord">—</div></div>
     </div>
 
     <!-- форма записи подхода -->
@@ -202,9 +205,27 @@ async function loadLibrary(){
     library = await apiGet('/api/exercises');
     renderEquipFilter();
     renderCategories();
+    openFromPlan();
   }catch(err){
     showToast('Не удалось загрузить упражнения. Проверь сервер.');
   }
+}
+
+// ---------- переход из программы: /workout.html?ex=squat&sets=4&reps=6 ----------
+function openFromPlan(){
+  const q = new URLSearchParams(location.search);
+  const exId = q.get('ex');
+  if(!exId) return;
+  const gi = library.findIndex(g => g.exercises.some(e => e.id === exId));
+  if(gi < 0) return;
+  $$('.cat-tab')[gi].click();
+  const ex = library[gi].exercises.find(e => e.id === exId);
+  const idx = currentItems.indexOf(ex);
+  const btn = $$('.ex-item')[idx];
+  if(btn){ btn.click(); }
+  if(q.get('sets')) document.getElementById('inSets').value = q.get('sets');
+  if(q.get('reps')) document.getElementById('inReps').value = q.get('reps');
+  document.getElementById('detailCard').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 // ---------- фильтр по инвентарю ----------
@@ -360,8 +381,8 @@ document.getElementById('logBtn').addEventListener('click', async (e)=>{
   btn.disabled = true; btn.textContent = '…';
   try{
     const res = await apiPost('/api/training/exercise-log', data);
-    if(res.is_pr){ showToast('🏆 Новый рекорд в «' + res.exercise + '»!'); }
-    else{ showToast('Подход записан ✓'); }
+    if(res.is_pr){ showToast('Новый рекорд в «' + res.exercise + '»'); }
+    else{ showToast('Подход записан'); }
     loadProgression(currentEx.id);
     loadHistory();
   }catch(err){

@@ -158,8 +158,9 @@ body::after{
 /* ---------- АДАПТИВ (общий) ---------- */
 @media (max-width:860px){
   .topbar{ padding:14px 18px; gap:12px; flex-wrap:wrap; }
-  .tabs{ order:3; width:100%; }
-  .tab{ flex:1; text-align:center; }
+  .tabs{ order:3; width:100%; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{ flex:0 0 auto; white-space:nowrap; text-align:center; }
   .top-right{ margin-left:auto; }
   .wrap{ padding:24px 18px; }
   .cols-2, .cols-3{ grid-template-columns:1fr; }

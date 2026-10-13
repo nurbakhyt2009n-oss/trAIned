@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>trAIned · Профиль атлета</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,6 +90,9 @@
 .plan .pi .v{ font-family:'JetBrains Mono',monospace; font-size:19px; color:var(--accent-bright); }
 .plan .pi .k{ font-size:10px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; margin-top:4px; }
 .success-actions{ display:flex; gap:12px; }
+.plan-training{ display:none; margin:-8px 0 24px; font-size:14px; color:var(--text-dim); }
+.to-dash{ display:inline-block; margin-top:16px; font-size:13px; color:var(--text-mute); }
+.to-dash:hover{ color:var(--accent); }
 .success-actions .btn{ flex:1; }
 
 @keyframes fade{ from{opacity:0} to{opacity:1} }
@@ -229,7 +233,30 @@
               <label for="e-i">Средний</label>
               <input type="radio" id="e-a" name="experience" value="Advanced">
               <label for="e-a">Продвинутый</label>
+              <input type="radio" id="e-p" name="experience" value="Pro">
+              <label for="e-p">Профи</label>
             </div>
+            <span class="help">Новичок — до 6 месяцев регулярных тренировок, средний — до 2 лет, продвинутый — 2+ года, профи — соревнуешься или тренируешься как спортсмен.</span>
+          </div>
+          <div class="field col-full">
+            <span class="label">Сколько дней в неделю готов тренироваться<span class="req">*</span></span>
+            <div class="seg">
+              <input type="radio" id="d-2" name="days_per_week" value="2"><label for="d-2">2</label>
+              <input type="radio" id="d-3" name="days_per_week" value="3" checked><label for="d-3">3</label>
+              <input type="radio" id="d-4" name="days_per_week" value="4"><label for="d-4">4</label>
+              <input type="radio" id="d-5" name="days_per_week" value="5"><label for="d-5">5</label>
+              <input type="radio" id="d-6" name="days_per_week" value="6"><label for="d-6">6</label>
+            </div>
+          </div>
+          <div class="field col-full">
+            <span class="label">Что есть для тренировок<span class="req">*</span></span>
+            <div class="seg">
+              <input type="checkbox" id="q-bw" name="equipment" value="bodyweight" checked><label for="q-bw">Своё тело / турник</label>
+              <input type="checkbox" id="q-db" name="equipment" value="dumbbells"><label for="q-db">Гантели</label>
+              <input type="checkbox" id="q-gym" name="equipment" value="gym"><label for="q-gym">Зал / штанга</label>
+              <input type="checkbox" id="q-band" name="equipment" value="band"><label for="q-band">Резина / жгут</label>
+            </div>
+            <span class="help">По этим ответам тренер сразу соберёт программу на 4 недели.</span>
           </div>
         </div>
       </section>
@@ -263,7 +290,7 @@
 
       <div class="submit-row">
         <button type="submit" class="btn" id="submitBtn">Создать профиль</button>
-        <p class="submit-hint">Данные хранятся локально в твоей базе trained.db.</p>
+        <p class="submit-hint">Данные видишь только ты. Изменить можно в любой момент.</p>
       </div>
 
       <div class="error-bar" id="errorBar"></div>
@@ -285,10 +312,12 @@
       <div class="pi"><div class="v" id="planF">—</div><div class="k">жиры, г</div></div>
       <div class="pi"><div class="v" id="planC">—</div><div class="k">углеводы, г</div></div>
     </div>
+    <p class="plan-training" id="planTraining"></p>
     <div class="success-actions">
       <button class="btn btn-ghost" id="editBtn" type="button">Изменить</button>
-      <a class="btn" href="/dashboard.html" style="text-decoration:none; display:grid; place-items:center;">В дашборд</a>
+      <a class="btn" href="/plan.html" style="text-decoration:none; display:grid; place-items:center;">Моя программа</a>
     </div>
+    <a class="to-dash" href="/dashboard.html">Перейти в дашборд</a>
   </div>
 </div>
 
@@ -356,15 +385,18 @@ form.addEventListener('submit', async (e)=>{
     experience:     val('experience') || 'Intermediate',
     injuries:       val('injuries').trim() || 'нет',
     pullups_max:    Number(val('pullups_max')) || 0,
-    bench_max:      Number(val('bench_max')) || 0
+    bench_max:      Number(val('bench_max')) || 0,
+    days_per_week:  Number(form.querySelector('input[name="days_per_week"]:checked')?.value) || 3,
+    equipment:      $$('input[name="equipment"]:checked', form).map(el => el.value)
   };
+  if(!data.equipment.length) data.equipment = ['bodyweight'];
 
   btn.disabled = true;
   btn.textContent = 'Сохраняем…';
 
   try{
     const result = await apiPost('/api/profile', data);
-    showSuccess(result.nutrition_plan);
+    showSuccess(result.nutrition_plan, result.training_plan);
   }catch(err){
     errorBar.textContent = 'Не удалось сохранить: ' + err.message + '. Проверь, что сервер запущен.';
     errorBar.classList.add('show');
@@ -373,7 +405,13 @@ form.addEventListener('submit', async (e)=>{
   }
 });
 
-function showSuccess(plan){
+function showSuccess(plan, training){
+  const tp = document.getElementById('planTraining');
+  if(training){
+    tp.textContent = 'Программа на 4 недели: ' + training.split + ', ' +
+      training.days_per_week + ' трен/нед, ~' + training.session_minutes + ' мин.';
+    tp.style.display = 'block';
+  }
   if(plan){
     document.getElementById('planCal').textContent = plan.target_calories ?? '—';
     document.getElementById('planP').textContent   = plan.protein ?? '—';

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>trAIned · Программа</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/style.css">
+
+<style>
+/* ====== СТИЛИ ТОЛЬКО ДЛЯ ПРОГРАММЫ ====== */
+.summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+.sum .k{ font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.04em; }
+.sum .v{ font-size:15px; color:var(--text); margin-top:4px; font-weight:600; }
+.sum .v.mono{ font-family:'JetBrains Mono',monospace; font-weight:500; }
+
+.next{ display:flex; align-items:center; gap:24px; flex-wrap:wrap;
+  border-color:var(--accent-deep); background:linear-gradient(180deg, rgba(200,168,106,.08), rgba(200,168,106,.02)); }
+.next .nk{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.08em; }
+.next .nv{ font-family:'Unbounded',sans-serif; font-weight:500; font-size:20px; margin-top:6px; }
+.next .nd{ font-size:13px; color:var(--text-dim); margin-top:4px; }
+.next .btn{ margin-left:auto; text-decoration:none; }
+
+.week-tabs{ display:flex; gap:8px; flex-wrap:wrap; }
+.week-tab{ border:1px solid var(--line); background:var(--surface); color:var(--text-dim); padding:10px 18px;
+  border-radius:var(--radius-sm); cursor:pointer; font-family:'Manrope',sans-serif; font-size:14px; font-weight:500;
+  transition:all .2s var(--ease); text-align:left; }
+.week-tab small{ display:block; font-size:11px; color:var(--text-mute); font-weight:500; margin-top:2px; }
+.week-tab:hover{ border-color:var(--line-strong); color:var(--text); }
+.week-tab.active{ border-color:var(--accent); color:var(--text); background:linear-gradient(180deg, rgba(200,168,106,.14), rgba(200,168,106,.05)); }
+.week-note{ margin-top:14px; font-size:14px; color:var(--text-dim); }
+
+.days{ display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:16px; margin-top:20px; }
+.day.is-next{ border-color:var(--accent); }
+.day-head{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.day-wd{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; }
+.day-name{ font-size:16px; font-weight:600; }
+.day-min{ margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-mute); }
+.day-focus{ font-size:12px; color:var(--text-mute); margin-top:4px; }
+.tag{ display:inline-block; font-size:10px; font-family:'JetBrains Mono',monospace; text-transform:uppercase;
+  letter-spacing:.05em; padding:2px 7px; border-radius:5px; background:var(--surface-2); color:var(--warn); margin-top:8px; }
+.tag.next-tag{ color:var(--accent-bright); margin-left:6px; }
+
+.ex-rows{ margin-top:14px; display:flex; flex-direction:column; }
+.ex-row{ display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:10px 0; border-top:1px solid var(--line);
+  text-decoration:none; color:inherit; }
+.ex-row:hover .ex-n{ color:var(--accent-bright); }
+.ex-n{ font-size:14px; font-weight:500; color:var(--text); transition:color .2s var(--ease); }
+.ex-sr{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text); text-align:right; white-space:nowrap; }
+.ex-h{ font-size:12px; color:var(--text-mute); }
+.ex-rest{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-mute); text-align:right; }
+.ex-row.main .ex-n::before{ content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
+  background:var(--accent); margin-right:8px; vertical-align:middle; }
+.finisher{ margin-top:12px; font-size:12px; color:var(--text-dim); padding:10px 12px; border-radius:var(--radius-sm); background:var(--bg-2); border:1px solid var(--line); }
+.recovery-list{ margin-top:14px; padding-left:18px; display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--text-dim); }
+
+.info-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.info-grid ul, .info-grid ol{ padding-left:18px; display:flex; flex-direction:column; gap:8px; }
+.info-grid li{ font-size:13px; color:var(--text-dim); line-height:1.55; }
+.notes{ margin-top:16px; display:flex; flex-direction:column; gap:8px; }
+.note{ font-size:13px; color:var(--text-dim); padding:10px 14px; border-left:2px solid var(--warn); background:var(--bg-2); border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+
+.setup .seg{ margin-top:8px; }
+.setup .field + .field{ margin-top:18px; }
+.legend{ font-size:12px; color:var(--text-mute); margin-top:14px; }
+.legend .dotm{ display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-right:6px; vertical-align:middle; }
+
+.hidden{ display:none; }
+.empty-state{ text-align:center; padding:60px 20px; color:var(--text-mute); }
+.empty-state a{ color:var(--accent); }
+
+@media (max-width:860px){
+  .summary{ grid-template-columns:repeat(2,1fr); }
+  .info-grid{ grid-template-columns:1fr; }
+  .days{ grid-template-columns:1fr; }
+  .next .btn{ margin-left:0; }
+}
+</style>
+</head>
+
+<body>
+
+<nav class="topbar">
+  <a class="brand" href="/dashboard.html">tr<span class="hl">AI</span>ned</a>
+  <div class="tabs">
+    <a class="tab" href="/dashboard.html">Дашборд</a>
+    <a class="tab active" href="/plan.html">Программа</a>
+    <a class="tab" href="/workout.html">Журнал</a>
+    <a class="tab" href="/food.html">Еда</a>
+    <a class="tab" href="/analytics.html">Аналитика</a>
+  </div>
+  <div class="top-right">
+    <a class="chat-link" href="/chat.html"><span class="dot"></span>AI-тренер</a>
+  </div>
+</nav>
+
+<div class="wrap" id="root">
+  <div class="hello">
+    <span class="eyebrow">Программа · 4 недели</span>
+    <h1 id="title">Загружаем программу…</h1>
+  </div>
+
+  <!-- первичная настройка (старые профили) -->
+  <div class="card setup hidden" id="setupCard"></div>
+
+  <div id="planBox" class="hidden">
+    <div class="card">
+      <div class="summary" id="summary"></div>
+    </div>
+
+    <div class="card next section-gap hidden" id="nextCard">
+      <div>
+        <div class="nk" id="nextKicker">Следующая тренировка</div>
+        <div class="nv" id="nextName">—</div>
+        <div class="nd" id="nextDesc">—</div>
+      </div>
+      <a class="btn" id="nextBtn" href="/workout.html">Начать и записывать</a>
+    </div>
+
+    <div class="section-gap">
+      <div class="week-tabs" id="weekTabs"></div>
+      <p class="week-note" id="weekNote"></p>
+      <div class="days" id="days"></div>
+      <p class="legend"><span class="dotm"></span>основные упражнения — в них главный прогресс. «Запас» — сколько повторов ты мог бы ещё сделать до отказа. Нажми на упражнение, чтобы записать подход.</p>
+    </div>
+
+    <div class="card section-gap">
+      <div class="card-title">
+        <span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18M7 14l4-4 3 3 5-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <h2 id="progModel">Как прогрессировать</h2>
+      </div>
+      <div class="info-grid">
+        <ol id="progRules"></ol>
+        <div>
+          <p class="muted" style="margin-bottom:8px;">Разминка</p>
+          <ul id="warmup"></ul>
+          <p class="muted" style="margin:14px 0 8px;">Заминка</p>
+          <ul id="cooldown"></ul>
+        </div>
+      </div>
+      <div class="notes" id="notes"></div>
+    </div>
+
+    <div class="card section-gap setup" id="settingsCard"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+<script>
+/* ====== ЛОГИКА СТРАНИЦЫ ПРОГРАММЫ ====== */
+const EQUIP = { bodyweight:'Своё тело', dumbbells:'Гантели', gym:'Зал / штанга', band:'Резина' };
+const LEVELS = [['Beginner','Новичок'],['Intermediate','Средний'],['Advanced','Продвинутый'],['Pro','Профи']];
+
+let state = { plan:null, next:null, week:1 };
+
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(text !== undefined && text !== null) e.textContent = text;
+  return e;
+}
+
+// ---------- форма настроек (дни / инвентарь / уровень) ----------
+function renderSettings(box, opts){
+  const s = opts.summary || {};
+  const days = s.days_per_week || 3;
+  const equip = s.equipment || ['bodyweight'];
+  const level = s.level || opts.experience || 'Intermediate';
+  box.innerHTML = '';
+
+  const title = el('div', 'card-title');
+  title.appendChild(el('h2', null, opts.heading));
+  box.appendChild(title);
+  if(opts.lead) box.appendChild(el('p', 'muted', opts.lead));
+
+  const mk = (label, type, name, items, isChecked) => {
+    const f = el('div', 'field');
+    f.style.marginTop = '18px';
+    f.appendChild(el('span', 'label', label));
+    const seg = el('div', 'seg');
+    items.forEach(([value, text])=>{
+      const id = box.id + '-' + name + '-' + value;
+      const inp = document.createElement('input');
+      inp.type = type; inp.name = name; inp.value = value; inp.id = id;
+      inp.checked = isChecked(value);
+      const lab = el('label', null, text); lab.htmlFor = id;
+      seg.appendChild(inp); seg.appendChild(lab);
+    });
+    f.appendChild(seg);
+    box.appendChild(f);
+  };
+  mk('Дней в неделю', 'radio', 'days', [2,3,4,5,6].map(d=>[String(d), String(d)]), v => Number(v) === days);
+  mk('Инвентарь', 'checkbox', 'equip', Object.entries(EQUIP), v => equip.includes(v));
+  mk('Уровень', 'radio', 'level', LEVELS, v => v === level);
+
+  const btn = el('button', 'btn section-gap', opts.button);
+  btn.style.marginTop = '22px';
+  btn.addEventListener('click', async ()=>{
+    const body = {
+      days_per_week: Number(box.querySelector('input[name="days"]:checked').value),
+      equipment: $$('input[name="equip"]:checked', box).map(i=>i.value),
+      experience: box.querySelector('input[name="level"]:checked').value
+    };
+    if(!body.equipment.length) body.equipment = ['bodyweight'];
+    btn.disabled = true; btn.textContent = 'Собираем программу…';
+    try{
+      const data = await apiPost('/api/training/plan', body);
+      showToast('Программа обновлена');
+      render(data);
+      window.scrollTo({ top:0, behavior:'smooth' });
+    }catch(err){
+      showToast('Не удалось обновить: ' + err.message);
+      btn.disabled = false; btn.textContent = opts.button;
+    }
+  });
+  box.appendChild(btn);
+}
+
+// ---------- отрисовка ----------
+function render(data){
+  if(data.needs_setup){
+    document.getElementById('title').textContent = 'Соберём твою программу';
+    const box = document.getElementById('setupCard');
+    box.classList.remove('hidden');
+    document.getElementById('planBox').classList.add('hidden');
+    renderSettings(box, { heading:'Два вопроса — и программа готова', experience:data.experience,
+      lead:'Сколько дней готов тренироваться и что есть под рукой. Остальное возьмём из профиля.',
+      button:'Собрать программу' });
+    return;
+  }
+  document.getElementById('setupCard').classList.add('hidden');
+  document.getElementById('planBox').classList.remove('hidden');
+
+  state.plan = data.plan;
+  state.next = data.next;
+  state.week = data.next ? data.next.week : 1;
+  const s = data.plan.summary;
+
+  document.getElementById('title').textContent = s.split;
+
+  // сводка
+  const sum = document.getElementById('summary');
+  sum.innerHTML = '';
+  [['Уровень', s.level_label], ['Цель', GOAL_LABELS[s.goal] || s.goal],
+   ['Тренировок в неделю', s.strength_days + (s.days_per_week > s.strength_days ? ' + ' + (s.days_per_week - s.strength_days) + ' восст.' : ''), true],
+   ['Длительность', '~' + s.session_minutes + ' мин', true],
+   ['Прогрессия', s.progression], ['Инвентарь', s.equipment.map(e=>EQUIP[e]).join(', ')],
+   ['Составлена', formatDate(data.created_on)], ['Недели', '3 рабочие + 1 лёгкая', false]
+  ].forEach(([k, v, mono])=>{
+    const d = el('div', 'sum');
+    d.appendChild(el('div', 'k', k));
+    d.appendChild(el('div', 'v' + (mono ? ' mono' : ''), v));
+    sum.appendChild(d);
+  });
+
+  // следующая тренировка
+  const nc = document.getElementById('nextCard');
+  if(data.next){
+    const n = data.next;
+    nc.classList.remove('hidden');
+    document.getElementById('nextKicker').textContent = n.cycle_complete
+      ? 'Цикл пройден — обнови максимумы в профиле'
+      : 'Следующая тренировка · неделя ' + n.week;
+    document.getElementById('nextName').textContent = n.day.name;
+    document.getElementById('nextDesc').textContent =
+      n.day.focus + ' · ' + n.day.exercises.length + ' упражнений · ~' + n.day.minutes + ' мин';
+    const first = n.day.exercises[0];
+    if(first) document.getElementById('nextBtn').href = logLink(first);
+  }else{
+    nc.classList.add('hidden');
+  }
+
+  renderWeekTabs();
+  renderWeek();
+
+  // прогрессия, разминка, заметки
+  document.getElementById('progModel').textContent = 'Как прогрессировать: ' + s.progression.toLowerCase();
+  fillList('progRules', data.plan.progression_rules);
+  fillList('warmup', data.plan.warmup);
+  fillList('cooldown', data.plan.cooldown);
+  const notes = document.getElementById('notes');
+  notes.innerHTML = '';
+  (data.plan.notes || []).forEach(t=> notes.appendChild(el('div', 'note', t)));
+
+  renderSettings(document.getElementById('settingsCard'), {
+    heading:'Изменить программу', summary:s,
+    lead:'Поменялся график или появился инвентарь — программа пересоберётся. Прогресс в журнале сохранится.',
+    button:'Пересобрать программу' });
+}
+
+function renderWeekTabs(){
+  const box = document.getElementById('weekTabs');
+  box.innerHTML = '';
+  state.plan.weeks.forEach(w=>{
+    const b = el('button', 'week-tab' + (w.week === state.week ? ' active' : ''), 'Неделя ' + w.week);
+    b.appendChild(el('small', null, w.title));
+    b.addEventListener('click', ()=>{ state.week = w.week; renderWeekTabs(); renderWeek(); });
+    box.appendChild(b);
+  });
+}
+
+function renderWeek(){
+  const w = state.plan.weeks[state.week - 1];
+  document.getElementById('weekNote').textContent =
+    w.note + ' Запас в каждом подходе: ' + w.rir + ' ' + (w.rir === 1 ? 'повтор' : 'повтора') + '.';
+  const box = document.getElementById('days');
+  box.innerHTML = '';
+  const n = state.next;
+
+  w.days.forEach(d=>{
+    const isNext = n && !n.cycle_complete && n.week === w.week && n.day_index === d.index;
+    const card = el('div', 'card day' + (isNext ? ' is-next' : ''));
+    const head = el('div', 'day-head');
+    head.appendChild(el('span', 'day-wd', d.weekday));
+    head.appendChild(el('span', 'day-name', d.name));
+    head.appendChild(el('span', 'day-min', '~' + d.minutes + ' мин'));
+    card.appendChild(head);
+    card.appendChild(el('div', 'day-focus', d.focus));
+    if(d.intensity) card.appendChild(el('span', 'tag', d.intensity));
+    if(isNext) card.appendChild(el('span', 'tag next-tag', 'следующая'));
+
+    if(d.type === 'recovery'){
+      const ul = el('ul', 'recovery-list');
+      (d.activities || []).forEach(a=> ul.appendChild(el('li', null, a)));
+      card.appendChild(ul);
+    }else{
+      const rows = el('div', 'ex-rows');
+      d.exercises.forEach(e=>{
+        const a = el('a', 'ex-row' + (e.role === 'main' ? ' main' : ''));
+        a.href = logLink(e);
+        a.appendChild(el('span', 'ex-n', e.name));
+        a.appendChild(el('span', 'ex-sr', e.sets + ' × ' + e.reps + (e.unit === 'сек' ? ' сек' : '')));
+        a.appendChild(el('span', 'ex-h', e.hint || ''));
+        a.appendChild(el('span', 'ex-rest', 'отдых ' + formatRest(e.rest)));
+        rows.appendChild(a);
+      });
+      card.appendChild(rows);
+      if(d.finisher) card.appendChild(el('div', 'finisher', d.finisher));
+    }
+    box.appendChild(card);
+  });
+}
+
+// ---------- мелочи ----------
+function logLink(e){
+  return '/workout.html?ex=' + encodeURIComponent(e.id) + '&sets=' + e.sets + '&reps=' + (e.reps_lo || '');
+}
+function formatRest(sec){
+  if(sec >= 60){ const m = sec / 60; return (Number.isInteger(m) ? m : m.toFixed(1)) + ' мин'; }
+  return sec + ' с';
+}
+function fillList(id, items){
+  const box = document.getElementById(id);
+  box.innerHTML = '';
+  (items || []).forEach(t=> box.appendChild(el('li', null, t)));
+}
+function formatDate(iso){
+  try{ return new Date(iso + 'T00:00:00').toLocaleDateString('ru-RU', { day:'numeric', month:'long' }); }
+  catch(e){ return iso; }
+}
+
+// ---------- старт ----------
+(async function(){
+  try{
+    const data = await apiGet('/api/training/plan');
+    render(data);
+  }catch(err){
+    document.getElementById('root').innerHTML =
+      '<div class="empty-state">Сначала заполни профиль.<br><br><a href="/">Перейти к онбордингу</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

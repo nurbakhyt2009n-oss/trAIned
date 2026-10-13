@@ -5,3 +5,5 @@ trained.db
 venv/
 .venv/
 .vscode/
+# local backups contain user data — never commit
+backups/
