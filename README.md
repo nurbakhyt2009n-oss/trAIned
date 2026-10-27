@@ -149,7 +149,7 @@ trAIned/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/trAIned.git
+(https://github.com/nurbakhyt2009n-oss/trAIned.git)
 cd trAIned
 
 # 2. (Recommended) create a virtual environment
