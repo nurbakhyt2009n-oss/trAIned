@@ -13,7 +13,7 @@ Get a full training program in one minute, scan your meals, and get advice tuned
 ![Render](https://img.shields.io/badge/Deployed-Render-46E3B7?logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-C8A86A)
 
-**[🌐 Live app](https://YOUR-APP.onrender.com)** · interface in Russian
+**[🌐 Live app](https://trained.onrender.com)** · interface in Russian
 
 </div>
 
